@@ -535,6 +535,8 @@ export class GrepTool implements AgentTool<typeof searchSchema, GrepToolDetails>
 					limitReached: false,
 				};
 				let skippedOversizedCount = 0;
+				// Only a glob spelled without a directory prefix matches at any depth.
+				// The parsed base alone cannot distinguish `*.ts` from `./*.ts`.
 				try {
 					if (exactFilePaths || multiTargets) {
 						const matches: GrepMatch[] = [];
@@ -546,6 +548,7 @@ export class GrepTool implements AgentTool<typeof searchSchema, GrepToolDetails>
 							? exactFilePaths.map(filePath => ({
 									basePath: filePath,
 									glob: undefined as string | undefined,
+									bareGlob: false,
 								}))
 							: (multiTargets ?? []);
 						for (const target of targets) {
@@ -554,6 +557,7 @@ export class GrepTool implements AgentTool<typeof searchSchema, GrepToolDetails>
 									pattern: normalizedPattern,
 									path: target.basePath,
 									glob: target.glob,
+									recursive: target.bareGlob === true,
 									ignoreCase,
 									multiline: effectiveMultiline,
 									hidden: true,
@@ -601,6 +605,7 @@ export class GrepTool implements AgentTool<typeof searchSchema, GrepToolDetails>
 								pattern: normalizedPattern,
 								path: searchPath,
 								glob: globFilter,
+								recursive: scope.bareGlob,
 								ignoreCase,
 								multiline: effectiveMultiline,
 								hidden: true,
@@ -634,7 +639,8 @@ export class GrepTool implements AgentTool<typeof searchSchema, GrepToolDetails>
 					const filteredMatches: GrepMatch[] = [];
 					for (const match of result.matches) {
 						const abs = resolveSearchResultPath(searchPath, match.path);
-						const ranges = rangesByAbsPath.get(abs);
+						// Native absolute matches can retain forward slashes on Windows; range keys use path.resolve.
+						const ranges = rangesByAbsPath.get(path.isAbsolute(match.path) ? path.resolve(abs) : abs);
 						if (!ranges) {
 							// Path has no line-range constraint (e.g. a peer entry without `:N-M`).
 							filteredMatches.push(match);
