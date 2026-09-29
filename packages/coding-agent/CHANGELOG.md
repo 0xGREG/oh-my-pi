@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+### Added
+
+- Submitting exactly `exit`, `quit`, or `q` (any case, no leading `/`, nothing else in the input) in a session with no messages now quits; turn off with `input.bareExitOnEmptySession` ([#13755](https://github.com/can1357/oh-my-pi/pull/13755) by [@H4vC](https://github.com/H4vC))
+
+### Fixed
+
+- Fixed `computer.window(74)` matching every open window and `computer.window({ id: 74 })` matching none; a numeric id now resolves the same window as `"74"` ([#13649](https://github.com/can1357/oh-my-pi/pull/13649) by [@will-bogusz](https://github.com/will-bogusz))
+- Automatic web search now prefers grounding from the active model's provider, using Anthropic search for Claude sessions and OpenAI search for Codex sessions while preserving explicit web-role configuration. ([#13011](https://github.com/can1357/oh-my-pi/pull/13011) by [@0xGREG](https://github.com/0xGREG))
+
+## [18.4.3] - 2026-09-28
+
+### Added
+
+- Batch `task` calls now start each subagent as soon as its `tasks[]` item finishes streaming instead of waiting for the whole call; launched agents are aborted if the finished call is invalid, blocked, or changed. Controlled by `task.speculativeLaunch` (default on; requires auto-allowed task approval and no extension tool lifecycle handlers)
+- Set `PI_SMART_GIT=1` to have every `git worktree add` in the bash tool — including inside compound commands, functions, and loops — copy-on-write clone the checkout (APFS, btrfs/XFS reflink, ReFS) instead of checking out every file, so new worktrees start with ignored build caches (`target/`, `node_modules/`) already in place; every `worktree add` option except `--orphan`, `--no-checkout`, `--track`, and `--relative-paths` is handled, and anything else still runs real git.
+
+### Changed
+
+- Running `omp "prompt"` without a terminal on stdin (scripts, CI, `</dev/null`) now runs the prompt headless like `-p`; a bare `omp` without a terminal exits 2 with an error instead of exiting silently ([#13623](https://github.com/can1357/oh-my-pi/pull/13623) by [@H4vC](https://github.com/H4vC))
+- Invalid `--thinking`, `--approval-mode`, and `--mode` values are now rejected with a usage error (exit 2) listing the valid values, instead of being silently ignored ([#13623](https://github.com/can1357/oh-my-pi/pull/13623) by [@H4vC](https://github.com/H4vC))
+- The default web search chain is now free-only: Parallel, the session's own model (new `web/hosted`), Exa, Firecrawl, SearXNG, and the credential-free scrapers. Paid engines (Perplexity, Tavily, Brave, Kagi, …) and other providers' chat models run only when you set them on the `web` role or its fallback chain.
+- Parallel, Exa, and Firecrawl now run their keyless endpoints in the automatic chain instead of only when explicitly selected.
+- Perplexity search no longer falls back to your OpenRouter key; select `openrouter/perplexity/…` explicitly to search through OpenRouter.
+- Hosted web search now follows the model rather than the host: GPT-5+ over any Responses API, Claude 4+ over any Messages API, and Gemini 2+ (including Gemini CLI), so `web/hosted` works through proxies and gateways. A model-backed search that returns no sources now counts as a failure, so the chain moves on to the next engine instead of showing an unsourced answer.
+- `web/hosted` first tries a cheaper model on the session's own provider (e.g. Opus → Haiku, GPT-5.x → GPT-5.6 Luna, Gemini Pro → Flash) and falls back to the session model itself when the host does not offer it or the call fails.
+- Image generation now tries the session provider's own image model first (e.g. GPT-5.x → `gpt-image-2`, Gemini → `gemini-3-pro-image`, Grok → `grok-imagine-image`), and a GPT-5+ session model generates images itself through the hosted image tool when its provider or proxy has no image model.
+- The default image model chain now uses `openai/gpt-image-2`, `openai-codex/gpt-image-2`, and the GA `gemini-3-pro-image` (Google and OpenRouter) instead of `gpt-image-1` and the Gemini preview id.
+- Reduced CPU while streaming replies and tool calls: the reveal no longer deep-compares frozen leading content on every flush, streamed argument extraction no longer re-verifies the whole prefix, and deltas no longer queue extension notifications when no extension listens for `message_update` ([#13650](https://github.com/can1357/oh-my-pi/pull/13650) by [@H4vC](https://github.com/H4vC)).
+- Reduced CPU and allocations for in-memory reads (URLs, notebooks, converted documents), tool-result spill checks, write read-projection guards, and hashline prefix stripping ([#13650](https://github.com/can1357/oh-my-pi/pull/13650) by [@H4vC](https://github.com/H4vC)).
+
+### Fixed
+
+- Fixed alt+p and `/switch` model picker latency by avoiding unnecessary catalog rebuilds
+- Fixed `--tools` with an unknown name printing a stack trace and listing only the tools left after filtering; it now prints a clean error naming unknown tools, built-in tools unavailable in the session, and the built-in and registered tools ([#13623](https://github.com/can1357/oh-my-pi/pull/13623) by [@H4vC](https://github.com/H4vC))
+- Fixed unknown CLI flags exiting 1 with an extra "ended before completing" line instead of exiting 2 ([#13623](https://github.com/can1357/oh-my-pi/pull/13623) by [@H4vC](https://github.com/H4vC))
+- Fixed a mistyped `--model` in print mode telling you to set an API key; it now suggests the closest available models ([#13623](https://github.com/can1357/oh-my-pi/pull/13623) by [@H4vC](https://github.com/H4vC))
+- Fixed the alt+p / `/switch` model picker taking seconds to appear: it rebuilt the whole model catalog on every open before painting, and now re-reads it only when startup discovery is still landing or models.yml changed
+- Fixed `tool_call` `additionalContext` being delivered more than once when several extension or hook handlers on the same call returned identical text ([#13633](https://github.com/can1357/oh-my-pi/pull/13633) by [@andrebrait](https://github.com/andrebrait))
+- Fixed hosted OpenAI web search on hosts that accept only string tool_choice values, such as Command Code ([#13666](https://github.com/can1357/oh-my-pi/pull/13666) by [@riicodespretty](https://github.com/riicodespretty))
+
+### Removed
+
+- Removed the web search provider picker from `omp setup`; set the `web` model role (or keep the free default chain) instead.
+
 ## [18.4.2] - 2026-09-28
 
 ### Added
@@ -246,37 +290,6 @@
 
 ### Fixed
 
-- Fixed `vault://` paths resolving to a different spelling for bash than for reads on Windows when `TEMP` or the profile directory uses an 8.3 short name like `ADMINI~1` ([#7911](https://github.com/can1357/oh-my-pi/issues/7911), [#7938](https://github.com/can1357/oh-my-pi/pull/7938) by [@CoderTCY](https://github.com/CoderTCY))
-- Fixed the bash tool on Windows keeping 8.3 short-name spellings like `ADMINI~1` in its working directory; `pwd` and `$PWD` now report the long path ([#7938](https://github.com/can1357/oh-my-pi/pull/7938) by [@CoderTCY](https://github.com/CoderTCY))
-- Fixed RPC `abort_and_prompt` scheduling failures being reported only as a late error response; the prompt now also completes with a `prompt_result`.
-- `omp update` and the startup update check now use your configured npm registry (`.npmrc`, `npm_config_registry`, or bunfig, including scoped registries and auth tokens) instead of always querying registry.npmjs.org ([#13115](https://github.com/can1357/oh-my-pi/pull/13115) by [@H4vC](https://github.com/H4vC))
-- Fixed auto-QA grievance pushes getting stuck forever behind one report the collector rejects: tool names are clamped to the collector's 128-byte limit, rejected reports are set aside with the server's error (shown in `omp grievances list` and `push`), and the rest of the queue keeps sending ([#13091](https://github.com/can1357/oh-my-pi/issues/13091), [#13119](https://github.com/can1357/oh-my-pi/pull/13119) by [@NaC-L](https://github.com/NaC-L))
-- Automatic web search now prefers grounding from the active model's provider, using Anthropic search for Claude sessions and OpenAI search for Codex sessions while preserving explicit web-role configuration. ([#13011](https://github.com/can1357/oh-my-pi/pull/13011) by [@0xGREG](https://github.com/0xGREG))
-- Fixed advisor reviews making an extra model request after a turn whose only tool calls were `advise`. That request re-sent the whole review context just so the advisor could reply "done", with no new notes. The review now ends after the advise-only turn; a turn that also calls other tools continues as before ([#13132](https://github.com/can1357/oh-my-pi/pull/13132) by [@alnaggar-dev](https://github.com/alnaggar-dev)).
-- Fixed the advisor replaying the whole main transcript after the main session's per-turn prune blanked tool results it had already seen. The advisor now keeps its context across the prune; rollback, branch, edited messages, compaction and session switch still re-prime it (part of [#7226](https://github.com/can1357/oh-my-pi/issues/7226), [#13131](https://github.com/can1357/oh-my-pi/pull/13131) by [@alnaggar-dev](https://github.com/alnaggar-dev)).
-- Fixed `/login` crashing source-link and dev installs with `NameTooLong reading "file:file:…"` once an extension loader had loaded. The legacy-pi specifier shim no longer re-enters itself while resolving a canonical `@oh-my-pi/pi-*` subpath such as `@oh-my-pi/pi-ai/index.js`, so `require()` of those subpaths resolves to the host copy ([#12293](https://github.com/can1357/oh-my-pi/issues/12293), [#13127](https://github.com/can1357/oh-my-pi/pull/13127) by [@alnaggar-dev](https://github.com/alnaggar-dev)).
-- Fixed advisors configured with `auto` thinking running at `medium` instead of following the main session's current effort. An `auto` advisor now runs at the effort the main session uses for the current turn (the classifier's pick under `auto`, the set level otherwise, `medium` when thinking is off), updated at each review without rebuilding the advisor; on a retry-fallback model it keeps the fallback's effort until its main model is restored ([#13130](https://github.com/can1357/oh-my-pi/pull/13130) by [@alnaggar-dev](https://github.com/alnaggar-dev)).
-- Fixed large edit diffs being sent whole in advisor reviews; they are now redacted and cut to 8 KiB / 300 lines, while other tool output keeps its 8 KiB / 80-line limit ([#13129](https://github.com/can1357/oh-my-pi/pull/13129), [#13184](https://github.com/can1357/oh-my-pi/pull/13184) by [@alnaggar-dev](https://github.com/alnaggar-dev)).
-- Updated `omp update` and the startup update check to use the configured npm registry, including scoped registries and authentication tokens.
-- Fixed auto-QA grievance uploads so an invalid report no longer blocks the rest of the queue; rejected reports are now reported with the server error.
-- Fixed Windows `read` failures for existing files when a line selector such as `:1-40` is used.
-- Fixed memory storage error reporting so failed `retain`, `learn`, and backend saves identify the failed item and include the underlying storage error.
-- Fixed malformed user-level `mcp.json` files disabling all MCP sources; valid sources now continue loading with a warning.
-- Fixed retry fallback loops that could retry indefinitely when a fallback resolved to the same effective request.
-- Fixed the setup wizard incorrectly reporting Gemini web search as unconfigured when Antigravity OAuth is active.
-- Fixed headless print mode abandoning the advisor's final review when the review model fails and a configured fallback reviewer is available.
-- Fixed embedded shell startup when the inherited working directory has been deleted.
-- Fixed Codex usage displays showing a stale subscription plan after the account plan changed.
-- Fixed explicit model or provider selections from bypassing `disabledProviders`; disabled providers are now refused and skipped during fallback.
-- Fixed usage views incorrectly combining model-specific quota limits with shared quota windows; each limit is now shown separately.
-- Fixed `write xd://<tool>` handling of devices with lenient argument validation so tools can provide their own precise responses for schema mismatches.
-- Fixed Anthropic server-side fallback requests failing because of an invalid fallback model name.
-- Fixed requests to large-output models failing near the context limit; the output allowance now adjusts to fit the remaining context.
-- Fixed system prompts that referenced tools by bare names when those tools were available only through `xd://` devices, including Hindsight and Mnemopi memory tools.
-- Fixed dictation remaining active when recording was restarted while the previous clip was still transcribing.
-- Fixed accounts that the auth layer signs out automatically going unannounced while the session silently moved to a sibling account: the session now warns with the account and the `/login` step, `omp -p` writes the warning to stderr, and JSON/RPC output carries it as a `notice` event. The auth broker now logs these disables as `Auth credential disabled` instead of `auth-broker credential disabled` ([#13190](https://github.com/can1357/oh-my-pi/pull/13190) by [@alphastorm](https://github.com/alphastorm)).
-- Fixed every mounted MCP tool being listed twice in the system prompt, once in the `xd://` catalog and again under MCP Tool Routes. Each tool now gets one route line with its summary, and a tool left out of the bounded routes keeps its catalog line ([#13195](https://github.com/can1357/oh-my-pi/pull/13195) by [@alphastorm](https://github.com/alphastorm)).
-- Fixed supervised services never reporting their exit to the agent: each exit was rejected as belonging to another session and replayed over and over, cutting `wait` short each time. An exit is now delivered to the session that started the service, including after you `/resume` back to that session ([#13199](https://github.com/can1357/oh-my-pi/pull/13199) by [@serverinspector](https://github.com/serverinspector)).
 - Fixed concurrent project access by enforcing file locking across processes.
 - Fixed Windows file reads with line selectors such as `:1-40`.
 - Fixed `omp update` and startup update checks to honor configured npm registries, including scoped registries and authentication tokens.
@@ -1719,38 +1732,4 @@
 - Added a status message when `CTRL-O` toggles tool-output expansion.
 - Fixed `omp usage` to report Codex Chat and Spark capacity meters separately when they share a usage window.
 
-## [18.0.8] - 2026-08-27
-
-### Added
-
-- Transcript usage rows now show the total prompt-to-yield time (Δ + clock, including tool calls) after the turn timestamp, opt-in via `display.showTurnTime` (off by default).
-- `omp usage` now shows Z.AI GLM Coding Plan credit quotas (5h + weekly) with the subscribed plan tier.
-- The usage status line now labels untiered quota windows with the report's plan tier, surfacing Z.AI Coding Plan (`pro`) and Codex plan names next to the 5h/7d percentages.
-
-### Fixed
-
-- Fixed corrupt session headers silently overwriting recoverable transcripts during resume ([#9915](https://github.com/can1357/oh-my-pi/issues/9915)).
-- Fixed a startup race that left a new session with almost no tools and an empty skill inventory. An early reconcile could commit a small live tool set as the permanent enabled set. The enabled set is now seeded from the construction-time tool slate, and `reconcileCodeMode` samples it inside the registry mutation lock.
-- Fixed `snapcompact` compaction frames larger than the persistence limit being truncated into invalid image base64 on session resume, which made the provider reject every subsequent request with HTTP 400; already-corrupted archives now resume from their retained source text instead ([#9901](https://github.com/can1357/oh-my-pi/issues/9901)).
-- Fixed prompts hanging when a successful automatic retry ended through an early terminal path such as `yield`.
-- Fixed `hub` `send await:true` blocking for the full IRC timeout when the awaited agent finished without replying; the send now settles as soon as the peer stops ([#9913](https://github.com/can1357/oh-my-pi/issues/9913)).
-- Fixed workspace symbol searches reporting success when every configured language server failed; partial failures now remain visible alongside successful results ([#8387](https://github.com/can1357/oh-my-pi/issues/8387)).
-- Handle denied working-directory changes without crashing resume, move, or startup flows.
-- Fixed Cursor-only sessions becoming permanently unusable after replaying orphaned async tool results.
-- Fixed `!command` config values (`auth.broker.url`, `auth.broker.token`, custom headers) passing inherited file descriptors to the resolution command; on POSIX these commands now run under `/bin/sh` (Windows keeps the built-in shell and is unchanged)
-- Fixed `providers.amazon-bedrock` guardrail, transport, and header settings being dropped for models referenced by an inference-profile ARN.
-- Fixed the welcome screen staying at its original width after a terminal resize; a settled rebuild now recomposes it at the new width like the rest of the transcript.
-- Fixed `omp if-bench` ending an Anthropic model's run on a transient `Refusal (cyber)` classification; the cyber classifier is stochastic near the threshold, so a refused turn is now retried with a fresh session (up to 3 attempts) before it is scored as a run-ending provider failure.
-- Fixed streamed assistant responses crashing when a later provider delta revised earlier Markdown; assistant output now stays mutable until finalization.
-- Fixed an orphaned foreground tool card surviving a later agent turn and pinning the entire transcript outside native scrollback; new turns now seal abandoned cards while preserving background-task updates.
-- Fixed resize and display replays to include naturally emitted active-head rows in one atomic bottom-first transaction without rewinding lifecycle state, while graceful shutdown still drains every eligible final suffix.
-- Fixed terminal resizes lagging on large transcripts: the transient resize repaint now renders only the visible tail instead of the entire committed transcript per resize event.
-- Fixed cache-miss dividers crashing completed streamed assistant messages after stable rows had entered native history; cache-miss status now trails the assistant output.
-- Fixed quitting re-streaming the entire committed transcript when a resize-triggered scrollback replay was still pending; shutdown now flushes only genuinely un-retired rows.
-- Fixed fast tool completions leaving a permanent running summary that blocked transcript retirement and squeezed later tool output.
-- Fixed `omp git` hunk navigation (`alt+↓`/`alt+↑`) appearing to do nothing while the file sidebar had focus: the diff cursor band now stays visible (dimmed) when the pane is unfocused.
-- Fixed the git TUI sidebar jumping back to the top of the file list after staging or unstaging a file; selection now stays on the nearest remaining row
-- Fixed the `aarch64-linux` `nix build` output segfaulting in the dynamic loader before startup by repointing the stale `DT_VERDEF` that `patchelf` leaves behind when it grows `.dynamic`, and surfaced smoke-test signal deaths in the build log instead of masking them ([#9881](https://github.com/can1357/oh-my-pi/issues/9881)).
-- Added custom RPC launcher builders so embedded clients can transport omp RPC through SSH and remote process managers.
-
-Older entries are archived in [packages/coding-agent/CHANGELOG.md@2d6380d359c0](https://github.com/can1357/oh-my-pi/blob/2d6380d359c09edcbbe46d56ddefe76692470659/packages/coding-agent/CHANGELOG.md).
+Older entries are archived in [packages/coding-agent/CHANGELOG.md@9856625e0aa1](https://github.com/can1357/oh-my-pi/blob/9856625e0aa1bc24e718ec9adde3b52c8ae856fd/packages/coding-agent/CHANGELOG.md).

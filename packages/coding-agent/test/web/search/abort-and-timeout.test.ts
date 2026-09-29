@@ -217,7 +217,7 @@ describe("executeSearch abort propagation", () => {
 
 		const codexResult = await runSearchQuery(
 			{ query: "anything" },
-			{ authStorage, modelRegistry, activeModel: codexModel },
+			{ authStorage, modelRegistry, sessionModel: codexModel },
 		);
 
 		expect(codexResult.details.response.provider).toBe("codex");
@@ -228,7 +228,7 @@ describe("executeSearch abort propagation", () => {
 		anthropicSearch.mockClear();
 		const anthropicResult = await runSearchQuery(
 			{ query: "anything" },
-			{ authStorage, modelRegistry, activeModel: anthropicModel },
+			{ authStorage, modelRegistry, sessionModel: anthropicModel },
 		);
 
 		expect(anthropicResult.details.response.provider).toBe("anthropic");
@@ -239,7 +239,7 @@ describe("executeSearch abort propagation", () => {
 		anthropicSearch.mockClear();
 		const hostedClaudeResult = await runSearchQuery(
 			{ query: "anything" },
-			{ authStorage, modelRegistry, activeModel: hostedClaudeModel },
+			{ authStorage, modelRegistry, sessionModel: hostedClaudeModel },
 		);
 
 		expect(hostedClaudeResult.details.response.provider).toBe("anthropic");
